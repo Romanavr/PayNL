@@ -1,0 +1,6 @@
+Don't forget enter path to exhcange url like this: http(s)://*yoursite.com*/component/com_jshopping/payments/pm_paynl/exchange.pgp in administration PayNL panel
+Also, enter ServiceID and Token in payment settings(Payments method -> PayNL -> Second Tab in the top) in JoomShopping component.
+For more information visit PayNL API page in administration panel
+
+
+Plugin created by Roman Avr and Alexey Startler
