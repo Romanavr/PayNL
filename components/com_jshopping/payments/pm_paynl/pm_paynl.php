@@ -25,18 +25,20 @@ class pm_paynl extends PaymentRoot{
 
     function showEndForm($pmconfigs, $order){
         require_once __DIR__ . '/paynl_api/vendor/autoload.php';
-        
+
         Paynl\Config::setServiceId($pmconfigs['paynl_serviceid']);
         Paynl\Config::setApiToken($pmconfigs['paynl_token']);
 
         $result = \Paynl\Transaction::start(array(
             'amount' => $order->order_total,
             'returnUrl' => JURI::base(),
-            'orderNumber' => $order->order_id
+            'orderNumber' => $order->order_id,
+            'currency' => $order->currency_code_iso
         ));
 
         $transactionUrl = $result->getRedirectUrl();
         header("Location: $transactionUrl");
+
 
         $db = JFactory::getDbo();
         $query = 'INSERT INTO `#__jshopping_payment_transactions` SET `transaction_id` = "'.$result->getTransactionId().'", `order_id` = "'.$order->order_id.'"';
