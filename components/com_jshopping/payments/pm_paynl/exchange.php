@@ -2,15 +2,37 @@
 /**
 @authors: Roman Avr, Alexey Startler
  */
+
 define('_JEXEC',1);
 define('JPATH_BASE', dirname(__FILE__). '/../../../../');
+define('JPATH_COMPONENT_SITE', JPATH_BASE."/components/com_jshopping");
 require_once JPATH_BASE . '/includes/defines.php';
 require_once JPATH_BASE . '/includes/framework.php';
 
+$app = JFactory::getApplication('site');
+$app->initialise();
+
+require_once (JPATH_COMPONENT_SITE."/lib/factory.php");
+require_once (JPATH_COMPONENT_SITE.'/lib/functions.php');
+
+require_once(JPATH_COMPONENT_SITE."/controllers/checkout.php");
+
+JTable::addIncludePath(JPATH_COMPONENT_SITE.'/tables');
+jimport('joomla.application.component.model');
+JModelLegacy::addIncludePath(JPATH_COMPONENT_SITE.'/models');
+
+$checkout = JModelLegacy::getInstance('checkout', 'jshop');
+$cart = JModelLegacy::getInstance('cart', 'jshop');
+$cart->load();
+$order = JTable::getInstance('order', 'jshop');
+
+
 require_once __DIR__ . '/paynl_api/vendor/autoload.php';
 
-//Set ExchangeURL in administration panel PayNL
+$jshopConfig = JSFactory::getConfig();
+JSFactory::loadLanguageFile();
 
+//Set ExchangeURL in administration panel PayNL
 $db = JFactory::getDbo();
 $query = "SELECT `payment_params` FROM `#__jshopping_payment_method` WHERE `scriptname` = 'pm_paynl' ";
 $db->setQuery($query);
@@ -28,7 +50,6 @@ $api_token = $api_token_configs[1];
 $transaction_end_status = $transaction_end_status_configs[1];
 
 
-
 \Paynl\Config::setServiceId($service_id);
 \Paynl\Config::setApiToken($api_token);
 
@@ -42,12 +63,23 @@ $db->query();
 $order_id = $db->loadResult();
 
 if($transaction->isPaid()) {
-    $db = JFactory::getDbo();
-    $query = "UPDATE `#__jshopping_orders` SET `order_status` = '$transaction_end_status',`order_created` = 1  WHERE `order_id` = '$order_id' ";
-    $query1 = "UPDATE `#__jshopping_order_history` SET `order_status_id` = '$transaction_end_status' WHERE `order_id` = '$order_id' ";
-    $db->setQuery($query);
-    $db->query();
-    $db->setQuery($query1);
-    $db->query();
+    $order->load($order_id);
+    if (!$order->order_created)
+    {
+        $order->order_created = 1;
+        $order->order_status = $transaction_end_status;
+        $order->store();
+        $order->changeProductQTYinStock("-");
+        $checkout->changeStatusOrder($order->order_id, $transaction_end_status, 0);
+        if ($jshopConfig->send_order_email)
+        {
+            $checkout->sendOrderEmail($order->order_id);
+        }
+        if ($transaction_end_status && $order->order_status != $transaction_end_status){
+            $checkout->changeStatusOrder($order->order_id, $transaction_end_status, 1);
+        }
+    }
+    $cart->clear();
+    $checkout->deleteSession();
 }
 ?>
